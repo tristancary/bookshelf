@@ -28,13 +28,30 @@
   --font-sans: var(--font-outfit), system-ui, -apple-system, sans-serif;
 }
 
+/* Force light palette regardless of user's system dark mode preference.
+   Without this, iOS/Android browsers auto-invert form controls. */
+html {
+  color-scheme: light;
+}
+
 html, body {
   background-color: var(--color-parchment);
   color: var(--color-ink);
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Safe-area padding utility used for iOS bottom nav */
+input, textarea, select {
+  background-color: #ffffff;
+  color: var(--color-ink);
+  color-scheme: light;
+}
+
+input::placeholder, textarea::placeholder {
+  color: var(--color-ink-muted);
+  opacity: 1;
+}
+
+/* Safe-area utilities */
 .pb-safe {
   padding-bottom: calc(env(safe-area-inset-bottom) + 0.5rem);
 }

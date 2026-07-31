@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { saveBook } from './actions'
+import { saveBook, checkDuplicate, type DuplicateBook } from './actions'
 import Scanner from './Scanner'
+import { ShelfSelector } from '@/components/ShelfSelector'
 
 type BookMetadata = {
   isbn: string
@@ -33,24 +34,39 @@ const emptyMeta: BookMetadata = {
   source: 'none',
 }
 
-export default function AddBookForm() {
+export default function AddBookForm({
+  existingShelves,
+}: {
+  existingShelves: string[]
+}) {
   const [mode, setMode] = useState<Mode>('choose')
   const [isbnInput, setIsbnInput] = useState('')
   const [meta, setMeta] = useState<BookMetadata>(emptyMeta)
+  const [shelves, setShelves] = useState<string[]>([])
   const [notes, setNotes] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
+  const [duplicate, setDuplicate] = useState<DuplicateBook | null>(null)
 
   async function performLookup(isbn: string) {
     setBusy(true)
     setError(null)
     setInfo(null)
+    setDuplicate(null)
     try {
       const clean = isbn.replace(/[-\s]/g, '')
-      const res = await fetch(`/api/lookup/${clean}`)
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
+
+      // Check for duplicate in parallel with lookup
+      const [dupResult, lookupRes] = await Promise.all([
+        checkDuplicate(clean),
+        fetch(`/api/lookup/${clean}`),
+      ])
+
+      if (dupResult) setDuplicate(dupResult)
+
+      if (!lookupRes.ok) {
+        const data = await lookupRes.json().catch(() => ({}))
         setInfo(
           data.error === 'Book not found'
             ? 'No metadata found. You can still fill it in manually.'
@@ -60,7 +76,7 @@ export default function AddBookForm() {
         setMode('edit')
         return
       }
-      const data: BookMetadata = await res.json()
+      const data: BookMetadata = await lookupRes.json()
       setMeta(data)
       setMode('edit')
     } catch {
@@ -90,6 +106,7 @@ export default function AddBookForm() {
       title: meta.title,
       authors: meta.authors,
       categories: meta.categories,
+      shelves,
       cover_url: meta.cover_url,
       published_year: meta.published_year,
       publisher: meta.publisher,
@@ -119,6 +136,8 @@ export default function AddBookForm() {
         <Tile
           onClick={() => {
             setMeta(emptyMeta)
+            setShelves([])
+            setDuplicate(null)
             setMode('edit')
           }}
           title="Add manually"
@@ -132,7 +151,7 @@ export default function AddBookForm() {
     return (
       <div className="space-y-4">
         {busy ? (
-          <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm">
+          <div className="rounded-md border border-success/30 bg-success/10 p-4 text-sm">
             Looking up book…
           </div>
         ) : (
@@ -148,8 +167,7 @@ export default function AddBookForm() {
   if (mode === 'isbn') {
     return (
       <form onSubmit={handleLookupSubmit} className="space-y-4">
-        <label className="block">
-          <span className="text-sm font-medium">ISBN</span>
+        <Field label="ISBN">
           <input
             type="text"
             inputMode="numeric"
@@ -158,25 +176,21 @@ export default function AddBookForm() {
             value={isbnInput}
             onChange={(e) => setIsbnInput(e.target.value)}
             placeholder="9780593135204"
-            className="mt-1 w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className={inputCls}
           />
-          <span className="mt-1 block text-xs text-neutral-500 dark:text-neutral-400">
+          <span className="mt-1 block text-xs text-ink-muted">
             Hyphens and spaces are fine.
           </span>
-        </label>
-        {error ? <p className="text-sm text-red-500">{error}</p> : null}
+        </Field>
+        {error ? <p className="text-sm text-danger">{error}</p> : null}
         <div className="flex gap-2">
-          <button
-            type="submit"
-            disabled={busy}
-            className="rounded-md bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2"
-          >
+          <button type="submit" disabled={busy} className={primaryCls}>
             {busy ? 'Looking up...' : 'Look up'}
           </button>
           <button
             type="button"
             onClick={() => setMode('choose')}
-            className="rounded-md border border-neutral-300 dark:border-neutral-700 text-sm px-4 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-900"
+            className={secondaryCls}
           >
             Back
           </button>
@@ -185,33 +199,52 @@ export default function AddBookForm() {
     )
   }
 
-  // mode === 'edit'
   return (
-    <form onSubmit={handleSave} className="space-y-4">
+    <form onSubmit={handleSave} className="space-y-5">
+      {duplicate ? (
+        <div className="rounded-lg border border-terracotta/40 bg-terracotta/10 p-4 space-y-2">
+          <p className="text-sm font-semibold text-terracotta-strong">
+            Already in your library
+          </p>
+          <p className="text-xs text-ink-soft">
+            {duplicate.title}
+            {duplicate.authors.length ? ` by ${duplicate.authors.join(', ')}` : ''}
+            {' '}is already on your shelf.
+          </p>
+          <div className="flex gap-2 pt-1">
+            <Link
+              href={`/book/${duplicate.id}`}
+              className="rounded-md border border-terracotta/50 bg-white text-terracotta-strong hover:bg-terracotta/10 text-xs font-medium px-3 py-1.5"
+            >
+              View existing entry
+            </Link>
+            <span className="text-xs text-ink-muted self-center">
+              or continue below to add another copy
+            </span>
+          </div>
+        </div>
+      ) : null}
+
       <div className="flex gap-4">
-        <div className="w-24 flex-shrink-0 aspect-[2/3] bg-neutral-100 dark:bg-neutral-900 rounded-md overflow-hidden">
+        <div className="w-24 flex-shrink-0 aspect-[2/3] bg-parchment-strong rounded-md overflow-hidden shadow-sm">
           {meta.cover_url ? (
             /* eslint-disable-next-line @next/next/no-img-element */
-            <img
-              src={meta.cover_url}
-              alt=""
-              className="w-full h-full object-cover"
-            />
+            <img src={meta.cover_url} alt="" className="w-full h-full object-cover" />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-xs text-neutral-400">
+            <div className="w-full h-full flex items-center justify-center text-xs text-ink-muted">
               No cover
             </div>
           )}
         </div>
         <div className="flex-1 min-w-0 space-y-2">
           {meta.source !== 'none' ? (
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">
+            <p className="text-xs text-ink-muted">
               Metadata from{' '}
               {meta.source === 'openlibrary' ? 'Open Library' : 'Google Books'}
             </p>
           ) : null}
           {info ? (
-            <p className="text-xs text-amber-600 dark:text-amber-500">{info}</p>
+            <p className="text-xs text-terracotta-strong">{info}</p>
           ) : null}
         </div>
       </div>
@@ -233,32 +266,24 @@ export default function AddBookForm() {
           onChange={(e) =>
             setMeta({
               ...meta,
-              authors: e.target.value
-                .split(',')
-                .map((s) => s.trim())
-                .filter(Boolean),
+              authors: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
             })
           }
           className={inputCls}
         />
       </Field>
 
-      <Field label="Categories (comma separated)">
-        <input
-          type="text"
-          value={meta.categories.join(', ')}
-          onChange={(e) =>
-            setMeta({
-              ...meta,
-              categories: e.target.value
-                .split(',')
-                .map((s) => s.trim())
-                .filter(Boolean),
-            })
-          }
-          className={inputCls}
+      <div>
+        <span className="text-sm font-medium text-ink-soft">Shelves</span>
+        <p className="text-xs text-ink-muted mt-0.5 mb-2">
+          Tap to add. Use custom names for readers or topics.
+        </p>
+        <ShelfSelector
+          value={shelves}
+          onChange={setShelves}
+          existing={existingShelves}
         />
-      </Field>
+      </div>
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="Year">
@@ -268,9 +293,7 @@ export default function AddBookForm() {
             onChange={(e) =>
               setMeta({
                 ...meta,
-                published_year: e.target.value
-                  ? parseInt(e.target.value, 10)
-                  : null,
+                published_year: e.target.value ? parseInt(e.target.value, 10) : null,
               })
             }
             className={inputCls}
@@ -318,20 +341,13 @@ export default function AddBookForm() {
         />
       </Field>
 
-      {error ? <p className="text-sm text-red-500">{error}</p> : null}
+      {error ? <p className="text-sm text-danger">{error}</p> : null}
 
       <div className="flex gap-2">
-        <button
-          type="submit"
-          disabled={busy}
-          className="rounded-md bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2"
-        >
+        <button type="submit" disabled={busy} className={primaryCls}>
           {busy ? 'Saving...' : 'Save book'}
         </button>
-        <Link
-          href="/"
-          className="rounded-md border border-neutral-300 dark:border-neutral-700 text-sm px-4 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-900"
-        >
+        <Link href="/" className={secondaryCls}>
           Cancel
         </Link>
       </div>
@@ -340,7 +356,13 @@ export default function AddBookForm() {
 }
 
 const inputCls =
-  'mt-1 w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500'
+  'mt-1 w-full rounded-md border border-line bg-white px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-indigo focus:border-indigo min-h-[44px]'
+
+const primaryCls =
+  'rounded-md bg-terracotta hover:bg-terracotta-strong disabled:opacity-50 text-white text-sm font-medium px-5 py-2.5 min-h-[44px] inline-flex items-center justify-center transition-colors'
+
+const secondaryCls =
+  'rounded-md border border-line bg-white hover:bg-parchment-soft text-ink text-sm font-medium px-5 py-2.5 min-h-[44px] inline-flex items-center justify-center transition-colors'
 
 function Field({
   label,
@@ -353,9 +375,9 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="text-sm font-medium">
+      <span className="text-sm font-medium text-ink-soft">
         {label}
-        {required ? <span className="text-red-500 ml-0.5">*</span> : null}
+        {required ? <span className="text-danger ml-0.5">*</span> : null}
       </span>
       {children}
     </label>
@@ -366,39 +388,19 @@ function Tile({
   onClick,
   title,
   subtitle,
-  disabled,
-  badge,
 }: {
   onClick?: () => void
   title: string
   subtitle: string
-  disabled?: boolean
-  badge?: string
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={disabled}
-      className={`w-full text-left rounded-lg border p-4 transition-colors ${
-        disabled
-          ? 'border-neutral-200 dark:border-neutral-800 opacity-60 cursor-not-allowed'
-          : 'border-neutral-300 dark:border-neutral-700 hover:border-emerald-500 hover:bg-emerald-500/5'
-      }`}
+      className="w-full text-left rounded-xl border border-line bg-white p-4 min-h-[64px] hover:border-terracotta hover:shadow-sm transition-all"
     >
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium">{title}</p>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-            {subtitle}
-          </p>
-        </div>
-        {badge ? (
-          <span className="text-xs rounded-full border border-neutral-300 dark:border-neutral-700 px-2 py-0.5 text-neutral-500 dark:text-neutral-400 whitespace-nowrap">
-            {badge}
-          </span>
-        ) : null}
-      </div>
+      <p className="text-sm font-semibold text-ink">{title}</p>
+      <p className="text-xs text-ink-muted mt-1">{subtitle}</p>
     </button>
   )
 }

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { updateBook, deleteBook } from './actions'
+import { ShelfSelector } from '@/components/ShelfSelector'
 
 export type Book = {
   id: string
@@ -10,6 +11,7 @@ export type Book = {
   title: string
   authors: string[]
   categories: string[]
+  shelves: string[]
   cover_url: string | null
   published_year: number | null
   publisher: string | null
@@ -23,17 +25,20 @@ type Mode = 'view' | 'edit'
 
 const inputCls =
   'mt-1 w-full rounded-md border border-line bg-white px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-indigo focus:border-indigo min-h-[44px]'
-
 const primaryCls =
   'rounded-md bg-terracotta hover:bg-terracotta-strong disabled:opacity-50 text-white text-sm font-medium px-5 py-2.5 min-h-[44px] inline-flex items-center justify-center transition-colors'
-
 const secondaryCls =
   'rounded-md border border-line bg-white hover:bg-parchment-soft text-ink text-sm font-medium px-5 py-2.5 min-h-[44px] inline-flex items-center justify-center transition-colors'
-
 const dangerCls =
   'rounded-md border border-danger/40 bg-white text-danger hover:bg-danger/10 disabled:opacity-50 text-sm font-medium px-5 py-2.5 min-h-[44px] inline-flex items-center justify-center transition-colors'
 
-export default function BookDetail({ book }: { book: Book }) {
+export default function BookDetail({
+  book,
+  existingShelves,
+}: {
+  book: Book
+  existingShelves: string[]
+}) {
   const router = useRouter()
   const [mode, setMode] = useState<Mode>('view')
   const [draft, setDraft] = useState<Book>(book)
@@ -50,6 +55,7 @@ export default function BookDetail({ book }: { book: Book }) {
       title: draft.title,
       authors: draft.authors,
       categories: draft.categories,
+      shelves: draft.shelves,
       cover_url: draft.cover_url,
       published_year: draft.published_year,
       publisher: draft.publisher,
@@ -82,7 +88,7 @@ export default function BookDetail({ book }: { book: Book }) {
 
   if (mode === 'edit') {
     return (
-      <form onSubmit={handleSave} className="space-y-4">
+      <form onSubmit={handleSave} className="space-y-5">
         <Field label="Title" required>
           <input
             type="text"
@@ -105,7 +111,20 @@ export default function BookDetail({ book }: { book: Book }) {
             className={inputCls}
           />
         </Field>
-        <Field label="Categories (comma separated)">
+
+        <div>
+          <span className="text-sm font-medium text-ink-soft">Shelves</span>
+          <p className="text-xs text-ink-muted mt-0.5 mb-2">
+            Tap to add or remove.
+          </p>
+          <ShelfSelector
+            value={draft.shelves}
+            onChange={(shelves) => setDraft({ ...draft, shelves })}
+            existing={existingShelves}
+          />
+        </div>
+
+        <Field label="Categories (auto from metadata, comma separated)">
           <input
             type="text"
             value={draft.categories.join(', ')}
@@ -118,6 +137,7 @@ export default function BookDetail({ book }: { book: Book }) {
             className={inputCls}
           />
         </Field>
+
         <div className="grid grid-cols-2 gap-3">
           <Field label="Year">
             <input
@@ -146,6 +166,7 @@ export default function BookDetail({ book }: { book: Book }) {
             />
           </Field>
         </div>
+
         <Field label="Publisher">
           <input
             type="text"
@@ -186,6 +207,7 @@ export default function BookDetail({ book }: { book: Book }) {
             className={inputCls}
           />
         </Field>
+
         {error ? <p className="text-sm text-danger">{error}</p> : null}
         <div className="flex gap-2">
           <button type="submit" disabled={busy} className={primaryCls}>
@@ -225,14 +247,14 @@ export default function BookDetail({ book }: { book: Book }) {
           {book.authors.length ? (
             <p className="text-sm text-ink-soft">{book.authors.join(', ')}</p>
           ) : null}
-          {book.categories.length ? (
+          {book.shelves.length ? (
             <div className="flex flex-wrap gap-1.5 pt-1">
-              {book.categories.map((c) => (
+              {book.shelves.map((s) => (
                 <span
-                  key={c}
-                  className="text-xs rounded-full border border-line bg-white px-2.5 py-0.5 text-ink-soft"
+                  key={s}
+                  className="text-xs font-medium rounded-full bg-indigo text-parchment px-2.5 py-1"
                 >
-                  {c}
+                  {s}
                 </span>
               ))}
             </div>
@@ -246,6 +268,24 @@ export default function BookDetail({ book }: { book: Book }) {
         <MetaRow label="Publisher" value={book.publisher} />
         <MetaRow label="ISBN" value={book.isbn} />
       </dl>
+
+      {book.categories.length ? (
+        <section className="border-t border-line pt-4">
+          <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted mb-2">
+            Categories
+          </h3>
+          <div className="flex flex-wrap gap-1.5">
+            {book.categories.map((c) => (
+              <span
+                key={c}
+                className="text-xs rounded-full border border-line bg-white px-2.5 py-0.5 text-ink-soft"
+              >
+                {c}
+              </span>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {book.description ? (
         <section className="border-t border-line pt-4">

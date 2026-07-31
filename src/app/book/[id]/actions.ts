@@ -10,6 +10,7 @@ export type UpdateBookInput = {
   title: string
   authors: string[]
   categories: string[]
+  shelves: string[]
   cover_url?: string | null
   published_year?: number | null
   publisher?: string | null
@@ -31,6 +32,7 @@ export async function updateBook(input: UpdateBookInput): Promise<{ error?: stri
       title,
       authors: input.authors.filter(Boolean),
       categories: input.categories.filter(Boolean),
+      shelves: input.shelves.filter(Boolean),
       cover_url: input.cover_url?.trim() || null,
       published_year: input.published_year ?? null,
       publisher: input.publisher?.trim() || null,
@@ -49,10 +51,8 @@ export async function updateBook(input: UpdateBookInput): Promise<{ error?: stri
 
 export async function deleteBook(id: string): Promise<{ error?: string }> {
   const supabase = await createClient()
-
   const { error } = await supabase.from('books').delete().eq('id', id)
   if (error) return { error: error.message }
-
   revalidatePath('/')
   redirect('/')
 }

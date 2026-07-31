@@ -70,8 +70,12 @@ export default async function Home() {
         ) : (
           <section className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {books?.map((book) => (
-              <div key={book.id} className="space-y-2">
-                <div className="aspect-[2/3] bg-neutral-100 dark:bg-neutral-900 rounded-md overflow-hidden">
+              <Link
+                key={book.id}
+                href={`/book/${book.id}`}
+                className="space-y-2 group"
+              >
+                <div className="aspect-[2/3] bg-neutral-100 dark:bg-neutral-900 rounded-md overflow-hidden transition-transform group-hover:scale-[1.02] group-hover:shadow-md">
                   {book.cover_url ? (
                     /* eslint-disable-next-line @next/next/no-img-element */
                     <img
@@ -86,14 +90,14 @@ export default async function Home() {
                   )}
                 </div>
                 <div>
-                  <p className="text-sm font-medium line-clamp-2 leading-tight">
+                  <p className="text-sm font-medium line-clamp-2 leading-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-500 transition-colors">
                     {book.title}
                   </p>
                   <p className="text-xs text-neutral-500 dark:text-neutral-400 line-clamp-1 mt-0.5">
                     {book.authors?.join(', ') ?? ''}
                   </p>
                 </div>
-              </div>
+              </Link>
             ))}
           </section>
         )}

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { saveBook } from './actions'
+import Scanner from './Scanner'
 
 type BookMetadata = {
   isbn: string
@@ -17,7 +18,7 @@ type BookMetadata = {
   source: 'openlibrary' | 'google' | 'none'
 }
 
-type Mode = 'choose' | 'isbn' | 'edit'
+type Mode = 'choose' | 'scan' | 'isbn' | 'edit'
 
 const emptyMeta: BookMetadata = {
   isbn: '',
@@ -41,13 +42,12 @@ export default function AddBookForm() {
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
 
-  async function handleLookup(e: React.FormEvent) {
-    e.preventDefault()
+  async function performLookup(isbn: string) {
     setBusy(true)
     setError(null)
     setInfo(null)
     try {
-      const clean = isbnInput.replace(/[-\s]/g, '')
+      const clean = isbn.replace(/[-\s]/g, '')
       const res = await fetch(`/api/lookup/${clean}`)
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
@@ -65,9 +65,20 @@ export default function AddBookForm() {
       setMode('edit')
     } catch {
       setError('Network error during lookup')
+      setMeta({ ...emptyMeta, isbn: isbn.replace(/[-\s]/g, '') })
+      setMode('edit')
     } finally {
       setBusy(false)
     }
+  }
+
+  async function handleLookupSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    await performLookup(isbnInput)
+  }
+
+  async function handleScanDetected(isbn: string) {
+    await performLookup(isbn)
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -90,17 +101,15 @@ export default function AddBookForm() {
       setError(result.error)
       setBusy(false)
     }
-    // On success, saveBook redirects to /
   }
 
   if (mode === 'choose') {
     return (
       <div className="space-y-3">
         <Tile
-          disabled
+          onClick={() => setMode('scan')}
           title="Scan barcode"
           subtitle="Point your camera at the back of the book"
-          badge="Coming next"
         />
         <Tile
           onClick={() => setMode('isbn')}
@@ -119,9 +128,26 @@ export default function AddBookForm() {
     )
   }
 
+  if (mode === 'scan') {
+    return (
+      <div className="space-y-4">
+        {busy ? (
+          <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm">
+            Looking up book…
+          </div>
+        ) : (
+          <Scanner
+            onDetected={handleScanDetected}
+            onCancel={() => setMode('choose')}
+          />
+        )}
+      </div>
+    )
+  }
+
   if (mode === 'isbn') {
     return (
-      <form onSubmit={handleLookup} className="space-y-4">
+      <form onSubmit={handleLookupSubmit} className="space-y-4">
         <label className="block">
           <span className="text-sm font-medium">ISBN</span>
           <input
@@ -180,7 +206,8 @@ export default function AddBookForm() {
         <div className="flex-1 min-w-0 space-y-2">
           {meta.source !== 'none' ? (
             <p className="text-xs text-neutral-500 dark:text-neutral-400">
-              Metadata from {meta.source === 'openlibrary' ? 'Open Library' : 'Google Books'}
+              Metadata from{' '}
+              {meta.source === 'openlibrary' ? 'Open Library' : 'Google Books'}
             </p>
           ) : null}
           {info ? (
@@ -206,7 +233,10 @@ export default function AddBookForm() {
           onChange={(e) =>
             setMeta({
               ...meta,
-              authors: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
+              authors: e.target.value
+                .split(',')
+                .map((s) => s.trim())
+                .filter(Boolean),
             })
           }
           className={inputCls}
@@ -220,7 +250,10 @@ export default function AddBookForm() {
           onChange={(e) =>
             setMeta({
               ...meta,
-              categories: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
+              categories: e.target.value
+                .split(',')
+                .map((s) => s.trim())
+                .filter(Boolean),
             })
           }
           className={inputCls}
@@ -235,7 +268,9 @@ export default function AddBookForm() {
             onChange={(e) =>
               setMeta({
                 ...meta,
-                published_year: e.target.value ? parseInt(e.target.value, 10) : null,
+                published_year: e.target.value
+                  ? parseInt(e.target.value, 10)
+                  : null,
               })
             }
             className={inputCls}

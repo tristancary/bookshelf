@@ -21,6 +21,18 @@ export type Book = {
 
 type Mode = 'view' | 'edit'
 
+const inputCls =
+  'mt-1 w-full rounded-md border border-line bg-white px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-indigo focus:border-indigo min-h-[44px]'
+
+const primaryCls =
+  'rounded-md bg-terracotta hover:bg-terracotta-strong disabled:opacity-50 text-white text-sm font-medium px-5 py-2.5 min-h-[44px] inline-flex items-center justify-center transition-colors'
+
+const secondaryCls =
+  'rounded-md border border-line bg-white hover:bg-parchment-soft text-ink text-sm font-medium px-5 py-2.5 min-h-[44px] inline-flex items-center justify-center transition-colors'
+
+const dangerCls =
+  'rounded-md border border-danger/40 bg-white text-danger hover:bg-danger/10 disabled:opacity-50 text-sm font-medium px-5 py-2.5 min-h-[44px] inline-flex items-center justify-center transition-colors'
+
 export default function BookDetail({ book }: { book: Book }) {
   const router = useRouter()
   const [mode, setMode] = useState<Mode>('view')
@@ -66,34 +78,11 @@ export default function BookDetail({ book }: { book: Book }) {
       setError(result.error)
       setBusy(false)
     }
-    // On success, deleteBook redirects to /
   }
 
   if (mode === 'edit') {
     return (
       <form onSubmit={handleSave} className="space-y-4">
-        <div className="flex gap-4">
-          <div className="w-24 flex-shrink-0 aspect-[2/3] bg-neutral-100 dark:bg-neutral-900 rounded-md overflow-hidden">
-            {draft.cover_url ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={draft.cover_url}
-                alt=""
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-xs text-neutral-400">
-                No cover
-              </div>
-            )}
-          </div>
-          <div className="flex-1 min-w-0 flex items-center">
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">
-              Editing
-            </p>
-          </div>
-        </div>
-
         <Field label="Title" required>
           <input
             type="text"
@@ -103,7 +92,6 @@ export default function BookDetail({ book }: { book: Book }) {
             className={inputCls}
           />
         </Field>
-
         <Field label="Authors (comma separated)">
           <input
             type="text"
@@ -111,16 +99,12 @@ export default function BookDetail({ book }: { book: Book }) {
             onChange={(e) =>
               setDraft({
                 ...draft,
-                authors: e.target.value
-                  .split(',')
-                  .map((s) => s.trim())
-                  .filter(Boolean),
+                authors: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
               })
             }
             className={inputCls}
           />
         </Field>
-
         <Field label="Categories (comma separated)">
           <input
             type="text"
@@ -128,16 +112,12 @@ export default function BookDetail({ book }: { book: Book }) {
             onChange={(e) =>
               setDraft({
                 ...draft,
-                categories: e.target.value
-                  .split(',')
-                  .map((s) => s.trim())
-                  .filter(Boolean),
+                categories: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
               })
             }
             className={inputCls}
           />
         </Field>
-
         <div className="grid grid-cols-2 gap-3">
           <Field label="Year">
             <input
@@ -146,9 +126,7 @@ export default function BookDetail({ book }: { book: Book }) {
               onChange={(e) =>
                 setDraft({
                   ...draft,
-                  published_year: e.target.value
-                    ? parseInt(e.target.value, 10)
-                    : null,
+                  published_year: e.target.value ? parseInt(e.target.value, 10) : null,
                 })
               }
               className={inputCls}
@@ -161,16 +139,13 @@ export default function BookDetail({ book }: { book: Book }) {
               onChange={(e) =>
                 setDraft({
                   ...draft,
-                  page_count: e.target.value
-                    ? parseInt(e.target.value, 10)
-                    : null,
+                  page_count: e.target.value ? parseInt(e.target.value, 10) : null,
                 })
               }
               className={inputCls}
             />
           </Field>
         </div>
-
         <Field label="Publisher">
           <input
             type="text"
@@ -179,7 +154,6 @@ export default function BookDetail({ book }: { book: Book }) {
             className={inputCls}
           />
         </Field>
-
         <Field label="ISBN">
           <input
             type="text"
@@ -188,7 +162,6 @@ export default function BookDetail({ book }: { book: Book }) {
             className={inputCls}
           />
         </Field>
-
         <Field label="Cover URL">
           <input
             type="url"
@@ -197,18 +170,14 @@ export default function BookDetail({ book }: { book: Book }) {
             className={inputCls}
           />
         </Field>
-
         <Field label="Description">
           <textarea
             rows={3}
             value={draft.description ?? ''}
-            onChange={(e) =>
-              setDraft({ ...draft, description: e.target.value })
-            }
+            onChange={(e) => setDraft({ ...draft, description: e.target.value })}
             className={inputCls}
           />
         </Field>
-
         <Field label="Notes">
           <textarea
             rows={2}
@@ -217,15 +186,9 @@ export default function BookDetail({ book }: { book: Book }) {
             className={inputCls}
           />
         </Field>
-
-        {error ? <p className="text-sm text-red-500">{error}</p> : null}
-
+        {error ? <p className="text-sm text-danger">{error}</p> : null}
         <div className="flex gap-2">
-          <button
-            type="submit"
-            disabled={busy}
-            className="rounded-md bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2"
-          >
+          <button type="submit" disabled={busy} className={primaryCls}>
             {busy ? 'Saving...' : 'Save changes'}
           </button>
           <button
@@ -235,7 +198,7 @@ export default function BookDetail({ book }: { book: Book }) {
               setMode('view')
               setError(null)
             }}
-            className="rounded-md border border-neutral-300 dark:border-neutral-700 text-sm px-4 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-900"
+            className={secondaryCls}
           >
             Cancel
           </button>
@@ -244,37 +207,30 @@ export default function BookDetail({ book }: { book: Book }) {
     )
   }
 
-  // view mode
   return (
     <div className="space-y-6">
       <div className="flex gap-4">
-        <div className="w-32 sm:w-40 flex-shrink-0 aspect-[2/3] bg-neutral-100 dark:bg-neutral-900 rounded-md overflow-hidden shadow-sm">
+        <div className="w-32 sm:w-40 flex-shrink-0 aspect-[2/3] bg-parchment-strong rounded-md overflow-hidden shadow-md">
           {book.cover_url ? (
             /* eslint-disable-next-line @next/next/no-img-element */
-            <img
-              src={book.cover_url}
-              alt={book.title}
-              className="w-full h-full object-cover"
-            />
+            <img src={book.cover_url} alt={book.title} className="w-full h-full object-cover" />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-xs text-neutral-400 p-2 text-center">
+            <div className="w-full h-full flex items-center justify-center text-xs text-ink-muted p-2 text-center">
               No cover
             </div>
           )}
         </div>
         <div className="flex-1 min-w-0 space-y-2">
-          <h2 className="text-xl font-semibold leading-tight">{book.title}</h2>
+          <h2 className="text-xl font-semibold leading-tight text-indigo">{book.title}</h2>
           {book.authors.length ? (
-            <p className="text-sm text-neutral-600 dark:text-neutral-400">
-              {book.authors.join(', ')}
-            </p>
+            <p className="text-sm text-ink-soft">{book.authors.join(', ')}</p>
           ) : null}
           {book.categories.length ? (
             <div className="flex flex-wrap gap-1.5 pt-1">
               {book.categories.map((c) => (
                 <span
                   key={c}
-                  className="text-xs rounded-full border border-neutral-300 dark:border-neutral-700 px-2 py-0.5 text-neutral-600 dark:text-neutral-400"
+                  className="text-xs rounded-full border border-line bg-white px-2.5 py-0.5 text-ink-soft"
                 >
                   {c}
                 </span>
@@ -284,7 +240,7 @@ export default function BookDetail({ book }: { book: Book }) {
         </div>
       </div>
 
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm border-t border-neutral-200 dark:border-neutral-800 pt-4">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm border-t border-line pt-4">
         <MetaRow label="Year" value={book.published_year} />
         <MetaRow label="Pages" value={book.page_count} />
         <MetaRow label="Publisher" value={book.publisher} />
@@ -292,42 +248,34 @@ export default function BookDetail({ book }: { book: Book }) {
       </dl>
 
       {book.description ? (
-        <section className="border-t border-neutral-200 dark:border-neutral-800 pt-4">
-          <h3 className="text-xs font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400 mb-2">
+        <section className="border-t border-line pt-4">
+          <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted mb-2">
             Description
           </h3>
-          <p className="text-sm leading-relaxed whitespace-pre-wrap">
-            {book.description}
-          </p>
+          <p className="text-sm leading-relaxed whitespace-pre-wrap">{book.description}</p>
         </section>
       ) : null}
 
       {book.notes ? (
-        <section className="border-t border-neutral-200 dark:border-neutral-800 pt-4">
-          <h3 className="text-xs font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400 mb-2">
+        <section className="border-t border-line pt-4">
+          <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted mb-2">
             Notes
           </h3>
-          <p className="text-sm leading-relaxed whitespace-pre-wrap">
-            {book.notes}
-          </p>
+          <p className="text-sm leading-relaxed whitespace-pre-wrap">{book.notes}</p>
         </section>
       ) : null}
 
-      {error ? <p className="text-sm text-red-500">{error}</p> : null}
+      {error ? <p className="text-sm text-danger">{error}</p> : null}
 
-      <div className="flex gap-2 border-t border-neutral-200 dark:border-neutral-800 pt-4">
-        <button
-          type="button"
-          onClick={() => setMode('edit')}
-          className="rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-4 py-2"
-        >
+      <div className="flex gap-2 border-t border-line pt-4">
+        <button type="button" onClick={() => setMode('edit')} className={primaryCls}>
           Edit
         </button>
         <button
           type="button"
           onClick={handleDelete}
           disabled={busy}
-          className="rounded-md border border-red-500/50 text-red-600 dark:text-red-500 hover:bg-red-500/10 disabled:opacity-50 text-sm font-medium px-4 py-2 ml-auto"
+          className={`${dangerCls} ml-auto`}
         >
           {busy ? 'Deleting...' : 'Delete'}
         </button>
@@ -335,9 +283,6 @@ export default function BookDetail({ book }: { book: Book }) {
     </div>
   )
 }
-
-const inputCls =
-  'mt-1 w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500'
 
 function Field({
   label,
@@ -350,20 +295,26 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="text-sm font-medium">
+      <span className="text-sm font-medium text-ink-soft">
         {label}
-        {required ? <span className="text-red-500 ml-0.5">*</span> : null}
+        {required ? <span className="text-danger ml-0.5">*</span> : null}
       </span>
       {children}
     </label>
   )
 }
 
-function MetaRow({ label, value }: { label: string; value: string | number | null }) {
+function MetaRow({
+  label,
+  value,
+}: {
+  label: string
+  value: string | number | null
+}) {
   if (value === null || value === undefined || value === '') return null
   return (
     <div>
-      <dt className="text-xs text-neutral-500 dark:text-neutral-400">{label}</dt>
+      <dt className="text-xs text-ink-muted">{label}</dt>
       <dd className="text-sm mt-0.5">{value}</dd>
     </div>
   )

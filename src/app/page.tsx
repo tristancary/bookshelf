@@ -1,14 +1,12 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requireHousehold } from '@/lib/queries'
+import { AppBar } from '@/components/AppBar'
+import { BottomNav } from '@/components/BottomNav'
 
 export default async function Home() {
   const household = await requireHousehold()
   const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
 
   const { count: memberCount } = await supabase
     .from('household_members')
@@ -24,63 +22,40 @@ export default async function Home() {
   const bookCount = books?.length ?? 0
 
   return (
-    <main className="min-h-screen bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100">
-      <div className="max-w-5xl mx-auto p-6 space-y-6">
-        <header className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              {household.name}
-            </h1>
-            <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
-              <Link
-                href="/household"
-                className="hover:text-neutral-900 dark:hover:text-neutral-100 underline underline-offset-2 decoration-neutral-300 dark:decoration-neutral-700"
-              >
-                {memberCount ?? 0} {memberCount === 1 ? 'member' : 'members'}
-              </Link>
-              {' · '}
-              {bookCount} {bookCount === 1 ? 'book' : 'books'}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link
-              href="/add"
-              className="rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-4 py-2 transition-colors"
-            >
-              Add book
-            </Link>
-            <form action="/auth/signout" method="post">
-              <button
-                type="submit"
-                className="rounded-md border border-neutral-300 dark:border-neutral-700 px-3 py-2 text-xs hover:bg-neutral-100 dark:hover:bg-neutral-900 transition-colors"
-              >
-                Sign out
-              </button>
-            </form>
-          </div>
-        </header>
+    <>
+      <AppBar
+        title={household.name}
+        subtitle={`${memberCount ?? 0} ${memberCount === 1 ? 'member' : 'members'} · ${bookCount} ${bookCount === 1 ? 'book' : 'books'}`}
+        actions={
+          <Link
+            href="/add"
+            className="rounded-md bg-terracotta hover:bg-terracotta-strong text-white text-sm font-medium px-3.5 py-2 min-h-[44px] inline-flex items-center transition-colors"
+          >
+            Add
+          </Link>
+        }
+      />
 
+      <main className="max-w-5xl mx-auto px-4 py-6 pb-24 space-y-6">
         {bookCount === 0 ? (
-          <section className="rounded-lg border border-dashed border-neutral-300 dark:border-neutral-800 p-10 text-center space-y-3">
-            <p className="text-neutral-500 dark:text-neutral-400">
-              Your library is empty.
-            </p>
+          <section className="rounded-xl border border-dashed border-line bg-parchment-soft p-10 text-center space-y-4">
+            <p className="text-ink-soft">Your library is empty.</p>
             <Link
               href="/add"
-              className="inline-block rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-4 py-2"
+              className="inline-block rounded-md bg-terracotta hover:bg-terracotta-strong text-white text-sm font-medium px-5 py-2.5 min-h-[44px]"
             >
               Add your first book
             </Link>
           </section>
         ) : (
-          <section className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          <section className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-4 gap-y-6">
             {books?.map((book) => (
               <Link
                 key={book.id}
                 href={`/book/${book.id}`}
-                className="space-y-2 group"
+                className="group block"
               >
-                <div className="aspect-[2/3] bg-neutral-100 dark:bg-neutral-900 rounded-md overflow-hidden transition-transform group-hover:scale-[1.02] group-hover:shadow-md">
+                <div className="aspect-[2/3] bg-parchment-strong rounded-md overflow-hidden shadow-sm transition-all group-hover:shadow-md group-hover:-translate-y-0.5">
                   {book.cover_url ? (
                     /* eslint-disable-next-line @next/next/no-img-element */
                     <img
@@ -89,16 +64,16 @@ export default async function Home() {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-xs text-neutral-400 p-2 text-center">
+                    <div className="w-full h-full flex items-center justify-center text-xs text-ink-muted p-2 text-center">
                       No cover
                     </div>
                   )}
                 </div>
-                <div>
-                  <p className="text-sm font-medium line-clamp-2 leading-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-500 transition-colors">
+                <div className="mt-2">
+                  <p className="text-sm font-medium leading-tight line-clamp-2 group-hover:text-indigo transition-colors">
                     {book.title}
                   </p>
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400 line-clamp-1 mt-0.5">
+                  <p className="text-xs text-ink-muted line-clamp-1 mt-0.5">
                     {book.authors?.join(', ') ?? ''}
                   </p>
                 </div>
@@ -106,11 +81,9 @@ export default async function Home() {
             ))}
           </section>
         )}
+      </main>
 
-        <p className="text-xs text-neutral-500 dark:text-neutral-400 pt-4 border-t border-neutral-200 dark:border-neutral-800">
-          Signed in as {user?.email}
-        </p>
-      </div>
-    </main>
+      <BottomNav />
+    </>
   )
 }

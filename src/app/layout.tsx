@@ -1,6 +1,13 @@
 import type { Metadata, Viewport } from 'next'
+import { Outfit } from 'next/font/google'
 import './globals.css'
 import ServiceWorkerRegistration from './ServiceWorkerRegistration'
+
+const outfit = Outfit({
+  subsets: ['latin'],
+  variable: '--font-outfit',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
   title: "Cary's Bookshelf",
@@ -30,8 +37,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <body className="antialiased">
+    <html lang="en" className={outfit.variable}>
+      <body className="antialiased bg-parchment text-ink font-sans min-h-screen">
         {children}
         <ServiceWorkerRegistration />
       </body>

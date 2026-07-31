@@ -14,42 +14,53 @@ export default async function OnboardingPage({
   const error = params.error
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-8 bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100">
-      <div className="max-w-sm w-full space-y-6">
-        <header>
-          <h1 className="text-3xl font-semibold tracking-tight">Bookshelf</h1>
-          <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
-            Name your library
-          </p>
-        </header>
+    <main className="min-h-screen flex items-center justify-center p-6 bg-parchment">
+      <div className="max-w-sm w-full space-y-8">
+        <div className="text-center space-y-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/icons/icon-192.png"
+            alt=""
+            className="w-20 h-20 mx-auto rounded-2xl shadow-sm"
+          />
+          <div>
+            <h1 className="text-2xl font-semibold text-indigo tracking-tight">
+              Name your library
+            </h1>
+            <p className="text-sm text-ink-muted mt-1">
+              You can change this later.
+            </p>
+          </div>
+        </div>
 
         <form action={createHousehold} className="space-y-4">
           <label className="block">
-            <span className="text-sm font-medium">Library name</span>
+            <span className="text-sm font-medium text-ink-soft">
+              Library name
+            </span>
             <input
               type="text"
               name="name"
               required
               defaultValue="Our Library"
-              className="mt-1 w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2.5 text-sm min-h-[44px] focus:outline-none focus:ring-2 focus:ring-indigo focus:border-indigo"
             />
-            <span className="mt-1 block text-xs text-neutral-500 dark:text-neutral-400">
-              You can change this later.
-            </span>
           </label>
           <button
             type="submit"
-            className="w-full rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium py-2 transition-colors"
+            className="w-full rounded-md bg-terracotta hover:bg-terracotta-strong text-white text-sm font-medium py-3 min-h-[48px] transition-colors"
           >
             Create library
           </button>
           {error ? (
-            <p className="text-sm text-red-500">{decodeURIComponent(error)}</p>
+            <p className="text-sm text-danger text-center">
+              {decodeURIComponent(error)}
+            </p>
           ) : null}
         </form>
 
-        <p className="text-xs text-neutral-500 dark:text-neutral-400">
-          You&apos;ll be able to invite others (like your partner) once your library is created.
+        <p className="text-xs text-ink-muted text-center">
+          You&apos;ll be able to invite family after your library is created.
         </p>
       </div>
     </main>

@@ -1,26 +1,18 @@
-import Link from 'next/link'
 import { requireHousehold } from '@/lib/queries'
+import { AppBar } from '@/components/AppBar'
+import { BottomNav } from '@/components/BottomNav'
 import AddBookForm from './AddBookForm'
 
 export default async function AddPage() {
   await requireHousehold()
 
   return (
-    <main className="min-h-screen bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100">
-      <div className="max-w-lg mx-auto p-6 space-y-6">
-        <header>
-          <Link
-            href="/"
-            className="text-xs text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100"
-          >
-            ← Back to library
-          </Link>
-          <h1 className="text-2xl font-semibold tracking-tight mt-1">
-            Add a book
-          </h1>
-        </header>
+    <>
+      <AppBar title="Add a book" back={{ href: '/' }} />
+      <main className="max-w-lg mx-auto px-4 py-6 pb-24">
         <AddBookForm />
-      </div>
-    </main>
+      </main>
+      <BottomNav />
+    </>
   )
 }

@@ -17,6 +17,8 @@ type BookMetadata = {
   page_count: number | null
   description: string | null
   source: 'openlibrary' | 'google' | 'none'
+  suggested_shelves: string[]
+  suggestion_source: 'rules' | 'llm' | 'none'
 }
 
 type Mode = 'choose' | 'scan' | 'isbn' | 'edit'
@@ -32,6 +34,8 @@ const emptyMeta: BookMetadata = {
   page_count: null,
   description: null,
   source: 'none',
+  suggested_shelves: [],
+  suggestion_source: 'none',
 }
 
 export default function AddBookForm({
@@ -57,7 +61,6 @@ export default function AddBookForm({
     try {
       const clean = isbn.replace(/[-\s]/g, '')
 
-      // Check for duplicate in parallel with lookup
       const [dupResult, lookupRes] = await Promise.all([
         checkDuplicate(clean),
         fetch(`/api/lookup/${clean}`),
@@ -73,15 +76,19 @@ export default function AddBookForm({
             : (data.error ?? 'Lookup failed')
         )
         setMeta({ ...emptyMeta, isbn: clean })
+        setShelves([])
         setMode('edit')
         return
       }
       const data: BookMetadata = await lookupRes.json()
       setMeta(data)
+      // Pre-select all suggested shelves as a helpful default; user can uncheck.
+      setShelves(data.suggested_shelves ?? [])
       setMode('edit')
     } catch {
       setError('Network error during lookup')
       setMeta({ ...emptyMeta, isbn: isbn.replace(/[-\s]/g, '') })
+      setShelves([])
       setMode('edit')
     } finally {
       setBusy(false)
@@ -199,6 +206,8 @@ export default function AddBookForm({
     )
   }
 
+  const hasSuggestions = meta.suggested_shelves.length > 0
+
   return (
     <form onSubmit={handleSave} className="space-y-5">
       {duplicate ? (
@@ -274,9 +283,18 @@ export default function AddBookForm({
       </Field>
 
       <div>
-        <span className="text-sm font-medium text-ink-soft">Shelves</span>
-        <p className="text-xs text-ink-muted mt-0.5 mb-2">
-          Tap to add. Use custom names for readers or topics.
+        <div className="flex items-baseline gap-2 mb-1">
+          <span className="text-sm font-medium text-ink-soft">Shelves</span>
+          {hasSuggestions ? (
+            <span className="text-xs text-ink-muted">
+              {meta.suggestion_source === 'llm'
+                ? 'suggested by AI'
+                : 'suggested from metadata'}
+            </span>
+          ) : null}
+        </div>
+        <p className="text-xs text-ink-muted mb-3">
+          Tap to add or remove. Use custom names for readers or topics.
         </p>
         <ShelfSelector
           value={shelves}

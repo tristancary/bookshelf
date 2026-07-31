@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { suggestShelves } from '@/lib/shelfSuggest'
 
 export type BookMetadata = {
   isbn: string
@@ -11,6 +12,8 @@ export type BookMetadata = {
   page_count: number | null
   description: string | null
   source: 'openlibrary' | 'google' | 'none'
+  suggested_shelves: string[]
+  suggestion_source: 'rules' | 'llm' | 'none'
 }
 
 function normalizeIsbn(isbn: string): string {
@@ -23,7 +26,9 @@ function extractYear(dateStr: string | undefined | null): number | null {
   return m ? parseInt(m[0], 10) : null
 }
 
-async function fromOpenLibrary(isbn: string): Promise<BookMetadata | null> {
+type PartialMetadata = Omit<BookMetadata, 'suggested_shelves' | 'suggestion_source'>
+
+async function fromOpenLibrary(isbn: string): Promise<PartialMetadata | null> {
   try {
     const res = await fetch(
       `https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`,
@@ -46,7 +51,7 @@ async function fromOpenLibrary(isbn: string): Promise<BookMetadata | null> {
       authors: (book.authors ?? []).map((a: { name: string }) => a.name),
       categories: (book.subjects ?? [])
         .map((s: { name: string }) => s.name)
-        .slice(0, 5),
+        .slice(0, 10),
       cover_url: cover,
       published_year: extractYear(book.publish_date),
       publisher: book.publishers?.[0]?.name ?? null,
@@ -59,7 +64,7 @@ async function fromOpenLibrary(isbn: string): Promise<BookMetadata | null> {
   }
 }
 
-async function fromGoogleBooks(isbn: string): Promise<BookMetadata | null> {
+async function fromGoogleBooks(isbn: string): Promise<PartialMetadata | null> {
   try {
     const res = await fetch(
       `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`,
@@ -81,7 +86,7 @@ async function fromGoogleBooks(isbn: string): Promise<BookMetadata | null> {
       isbn,
       title: v.title ?? '',
       authors: v.authors ?? [],
-      categories: (v.categories ?? []).slice(0, 5),
+      categories: (v.categories ?? []).slice(0, 10),
       cover_url: cover,
       published_year: extractYear(v.publishedDate),
       publisher: v.publisher ?? null,
@@ -108,13 +113,29 @@ export async function GET(
     )
   }
 
-  const result = (await fromOpenLibrary(isbn)) ?? (await fromGoogleBooks(isbn))
+  const partial =
+    (await fromOpenLibrary(isbn)) ?? (await fromGoogleBooks(isbn))
 
-  if (!result) {
+  if (!partial) {
     return NextResponse.json(
       { error: 'Book not found', isbn },
       { status: 404 }
     )
+  }
+
+  // Shelf suggestion runs after metadata is resolved.
+  // Rules are instant; LLM adds ~1-2s only when rules find nothing.
+  const suggestion = await suggestShelves({
+    title: partial.title,
+    authors: partial.authors,
+    categories: partial.categories,
+    description: partial.description,
+  })
+
+  const result: BookMetadata = {
+    ...partial,
+    suggested_shelves: suggestion.shelves,
+    suggestion_source: suggestion.source,
   }
 
   return NextResponse.json(result)

@@ -32,7 +32,12 @@ export default async function Home() {
               {household.name}
             </h1>
             <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
-              {memberCount ?? 0} {memberCount === 1 ? 'member' : 'members'}
+              <Link
+                href="/household"
+                className="hover:text-neutral-900 dark:hover:text-neutral-100 underline underline-offset-2 decoration-neutral-300 dark:decoration-neutral-700"
+              >
+                {memberCount ?? 0} {memberCount === 1 ? 'member' : 'members'}
+              </Link>
               {' · '}
               {bookCount} {bookCount === 1 ? 'book' : 'books'}
             </p>

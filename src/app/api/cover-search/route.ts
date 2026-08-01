@@ -15,8 +15,9 @@ export async function GET(request: Request) {
   }
 
   try {
+    // Open Library search API. Returns docs with cover_i for cover lookup.
     const res = await fetch(
-      `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=12`,
+      `https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=20&fields=title,author_name,cover_i,edition_count`,
       { next: { revalidate: 60 * 60 } }
     )
     if (!res.ok) {
@@ -24,30 +25,26 @@ export async function GET(request: Request) {
     }
 
     const data = await res.json()
-    const items = (data.items ?? []) as Array<{
-      volumeInfo?: {
-        title?: string
-        authors?: string[]
-        imageLinks?: { thumbnail?: string; smallThumbnail?: string }
-      }
+    const docs = (data.docs ?? []) as Array<{
+      title?: string
+      author_name?: string[]
+      cover_i?: number
     }>
 
-    const results: CoverResult[] = items
-      .map((item) => {
-        const v = item.volumeInfo ?? {}
-        let url = v.imageLinks?.thumbnail ?? v.imageLinks?.smallThumbnail ?? null
-        if (!url) return null
-        if (url.startsWith('http://')) url = url.replace('http://', 'https://')
-        // Bump zoom parameter to get a larger image (Google supports this)
-        url = url.replace(/&zoom=\d+/, '&zoom=1')
-        return {
-          url,
-          title: v.title ?? 'Untitled',
-          authors: v.authors ?? [],
-        }
+    const seen = new Set<number>()
+    const results: CoverResult[] = []
+
+    for (const doc of docs) {
+      if (!doc.cover_i) continue
+      if (seen.has(doc.cover_i)) continue
+      seen.add(doc.cover_i)
+      results.push({
+        url: `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`,
+        title: doc.title ?? 'Untitled',
+        authors: doc.author_name ?? [],
       })
-      .filter((r): r is CoverResult => r !== null)
-      .slice(0, 8)
+      if (results.length >= 12) break
+    }
 
     return NextResponse.json({ results })
   } catch {

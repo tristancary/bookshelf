@@ -26,16 +26,60 @@ function extractYear(dateStr: string | undefined | null): number | null {
   return m ? parseInt(m[0], 10) : null
 }
 
+// OL descriptions come as either a string or `{type: "...", value: "..."}`
+function extractOlDescription(raw: unknown): string | null {
+  if (!raw) return null
+  if (typeof raw === 'string') return raw
+  if (typeof raw === 'object' && 'value' in raw) {
+    const v = (raw as { value?: unknown }).value
+    if (typeof v === 'string') return v
+  }
+  return null
+}
+
+async function fetchOlDescription(isbn: string): Promise<string | null> {
+  try {
+    const editionRes = await fetch(
+      `https://openlibrary.org/isbn/${isbn}.json`,
+      { next: { revalidate: 60 * 60 * 24 } }
+    )
+    if (!editionRes.ok) return null
+    const edition = await editionRes.json()
+
+    // Try the edition's own description first
+    const editionDesc = extractOlDescription(edition.description)
+    if (editionDesc) return editionDesc
+
+    // Fall back to the work's description
+    const workKey = edition.works?.[0]?.key
+    if (!workKey || typeof workKey !== 'string') return null
+
+    const workRes = await fetch(`https://openlibrary.org${workKey}.json`, {
+      next: { revalidate: 60 * 60 * 24 },
+    })
+    if (!workRes.ok) return null
+    const work = await workRes.json()
+    return extractOlDescription(work.description)
+  } catch {
+    return null
+  }
+}
+
 type PartialMetadata = Omit<BookMetadata, 'suggested_shelves' | 'suggestion_source'>
 
 async function fromOpenLibrary(isbn: string): Promise<PartialMetadata | null> {
   try {
-    const res = await fetch(
-      `https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`,
-      { next: { revalidate: 60 * 60 * 24 } }
-    )
-    if (!res.ok) return null
-    const data = await res.json()
+    // Fetch structured data and description in parallel
+    const [dataRes, description] = await Promise.all([
+      fetch(
+        `https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`,
+        { next: { revalidate: 60 * 60 * 24 } }
+      ),
+      fetchOlDescription(isbn),
+    ])
+
+    if (!dataRes.ok) return null
+    const data = await dataRes.json()
     const book = data[`ISBN:${isbn}`]
     if (!book) return null
 
@@ -56,7 +100,7 @@ async function fromOpenLibrary(isbn: string): Promise<PartialMetadata | null> {
       published_year: extractYear(book.publish_date),
       publisher: book.publishers?.[0]?.name ?? null,
       page_count: book.number_of_pages ?? null,
-      description: null, // OL's data endpoint doesn't include descriptions
+      description,
       source: 'openlibrary',
     }
   } catch {
@@ -113,7 +157,6 @@ export async function GET(
     )
   }
 
-  // Fetch both in parallel so we can enrich missing fields from either source
   const [olResult, gbResult] = await Promise.all([
     fromOpenLibrary(isbn).catch(() => null),
     fromGoogleBooks(isbn).catch(() => null),
@@ -127,13 +170,11 @@ export async function GET(
     )
   }
 
-  // Cross-enrich: fill missing description and cover from the other source
   const secondary = primary === olResult ? gbResult : olResult
   const merged: PartialMetadata = {
     ...primary,
     description: primary.description || secondary?.description || null,
     cover_url: primary.cover_url || secondary?.cover_url || null,
-    // Merge categories from both, dedupe
     categories: Array.from(
       new Set([...(primary.categories ?? []), ...(secondary?.categories ?? [])])
     ).slice(0, 10),

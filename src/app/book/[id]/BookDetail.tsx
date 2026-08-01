@@ -9,6 +9,7 @@ import {
   deleteReadingLog,
   type LogStatus,
 } from './reading-actions'
+import { refreshBookMetadata } from './refresh-action'
 import { ShelfSelector } from '@/components/ShelfSelector'
 import { CoverSearch } from '@/components/CoverSearch'
 
@@ -75,6 +76,7 @@ export default function BookDetail({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showCoverSearch, setShowCoverSearch] = useState(false)
+  const [refreshMsg, setRefreshMsg] = useState<string | null>(null)
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -116,6 +118,32 @@ export default function BookDetail({
       setError(result.error)
       setBusy(false)
     }
+  }
+
+  async function handleRefresh() {
+    if (!draft.isbn) {
+      setRefreshMsg('This book has no ISBN to refresh from.')
+      return
+    }
+    setBusy(true)
+    setRefreshMsg(null)
+    setError(null)
+    const result = await refreshBookMetadata(book.id)
+    setBusy(false)
+    if (result?.error) {
+      setRefreshMsg(`Refresh failed: ${result.error}`)
+      return
+    }
+    if (!result?.updatedFields || result.updatedFields.length === 0) {
+      setRefreshMsg('No missing fields to update. Everything is already filled in.')
+      return
+    }
+    setRefreshMsg(`Updated: ${result.updatedFields.join(', ')}. Reloading...`)
+    // Refresh page data so the form reflects the new values
+    setTimeout(() => {
+      router.refresh()
+      setMode('view')
+    }, 800)
   }
 
   if (mode === 'edit') {
@@ -278,6 +306,31 @@ export default function BookDetail({
             className={inputCls}
           />
         </Field>
+
+        {draft.isbn ? (
+          <div className="rounded-lg border border-line bg-parchment-soft p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-medium">Refresh from ISBN</p>
+                <p className="text-xs text-ink-muted mt-0.5">
+                  Fill in any missing fields (description, cover, categories) from Open Library and Google Books. Won&apos;t overwrite existing data.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleRefresh}
+                disabled={busy}
+                className="rounded-md border border-indigo text-indigo hover:bg-indigo/10 disabled:opacity-50 text-sm font-medium px-3 py-2 min-h-[40px] shrink-0"
+              >
+                {busy ? 'Working...' : 'Refresh'}
+              </button>
+            </div>
+            {refreshMsg ? (
+              <p className="text-xs text-ink-soft">{refreshMsg}</p>
+            ) : null}
+          </div>
+        ) : null}
+
         <Field label="Notes">
           <textarea
             rows={2}
@@ -298,6 +351,7 @@ export default function BookDetail({
               setDraft(book)
               setMode('view')
               setShowCoverSearch(false)
+              setRefreshMsg(null)
               setError(null)
             }}
             className={secondaryCls}

@@ -4,6 +4,8 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { saveBook, checkDuplicate, type DuplicateBook } from './actions'
 import Scanner from './Scanner'
+import BulkScanner from './BulkScanner'
+import type { BulkScanResult } from './bulk-actions'
 import { ShelfSelector } from '@/components/ShelfSelector'
 
 type BookMetadata = {
@@ -21,7 +23,8 @@ type BookMetadata = {
   suggestion_source: 'rules' | 'llm' | 'none'
 }
 
-type Mode = 'choose' | 'scan' | 'isbn' | 'edit'
+type SessionItem = BulkScanResult & { key: number }
+type Mode = 'choose' | 'scan' | 'bulk' | 'bulk_summary' | 'isbn' | 'edit'
 
 const emptyMeta: BookMetadata = {
   isbn: '',
@@ -52,6 +55,7 @@ export default function AddBookForm({
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
   const [duplicate, setDuplicate] = useState<DuplicateBook | null>(null)
+  const [bulkSession, setBulkSession] = useState<SessionItem[]>([])
 
   async function performLookup(isbn: string) {
     setBusy(true)
@@ -82,7 +86,6 @@ export default function AddBookForm({
       }
       const data: BookMetadata = await lookupRes.json()
       setMeta(data)
-      // Pre-select all suggested shelves as a helpful default; user can uncheck.
       setShelves(data.suggested_shelves ?? [])
       setMode('edit')
     } catch {
@@ -131,9 +134,15 @@ export default function AddBookForm({
     return (
       <div className="space-y-3">
         <Tile
+          onClick={() => setMode('bulk')}
+          title="Bulk scan"
+          subtitle="Rapid-fire scanning; books save automatically"
+          badge="Fast"
+        />
+        <Tile
           onClick={() => setMode('scan')}
-          title="Scan barcode"
-          subtitle="Point your camera at the back of the book"
+          title="Scan one book"
+          subtitle="Review before saving"
         />
         <Tile
           onClick={() => setMode('isbn')}
@@ -151,6 +160,33 @@ export default function AddBookForm({
           subtitle="No ISBN, no lookup"
         />
       </div>
+    )
+  }
+
+  if (mode === 'bulk') {
+    return (
+      <BulkScanner
+        onDone={(session) => {
+          setBulkSession(session)
+          setMode('bulk_summary')
+        }}
+        onCancel={() => setMode('choose')}
+      />
+    )
+  }
+
+  if (mode === 'bulk_summary') {
+    return (
+      <BulkSummary
+        session={bulkSession}
+        onScanMore={() => {
+          setBulkSession([])
+          setMode('bulk')
+        }}
+        onDone={() => {
+          window.location.href = '/'
+        }}
+      />
     )
   }
 
@@ -294,7 +330,7 @@ export default function AddBookForm({
           ) : null}
         </div>
         <p className="text-xs text-ink-muted mb-3">
-          Tap to add or remove. Use custom names for readers or topics.
+          Tap to add or remove.
         </p>
         <ShelfSelector
           value={shelves}
@@ -373,6 +409,147 @@ export default function AddBookForm({
   )
 }
 
+function BulkSummary({
+  session,
+  onScanMore,
+  onDone,
+}: {
+  session: SessionItem[]
+  onScanMore: () => void
+  onDone: () => void
+}) {
+  const added = session.filter((s) => s.status === 'added')
+  const duplicates = session.filter((s) => s.status === 'duplicate')
+  const unresolved = session.filter(
+    (s) => s.status === 'not_found' || s.status === 'error'
+  )
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-3 gap-2 text-center">
+        <StatCard label="Added" value={added.length} tone="success" />
+        <StatCard label="Duplicates" value={duplicates.length} />
+        <StatCard label="Unresolved" value={unresolved.length} tone="danger" />
+      </div>
+
+      {added.length > 0 ? (
+        <section>
+          <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted mb-2">
+            Added to library ({added.length})
+          </h3>
+          <ul className="grid grid-cols-4 gap-2">
+            {added.map((s) =>
+              s.status === 'added' ? (
+                <li key={s.key}>
+                  <Link
+                    href={`/book/${s.book_id}`}
+                    className="block aspect-[2/3] bg-parchment-strong rounded overflow-hidden border border-line hover:border-indigo"
+                    title={s.title}
+                  >
+                    {s.cover_url ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={s.cover_url}
+                        alt={s.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-[10px] text-ink-muted p-1 text-center">
+                        {s.title}
+                      </div>
+                    )}
+                  </Link>
+                </li>
+              ) : null
+            )}
+          </ul>
+        </section>
+      ) : null}
+
+      {unresolved.length > 0 ? (
+        <section>
+          <h3 className="text-xs font-medium uppercase tracking-wide text-danger mb-2">
+            Unresolved ({unresolved.length})
+          </h3>
+          <p className="text-xs text-ink-muted mb-2">
+            These couldn&apos;t be looked up automatically. Type each ISBN manually to fill in metadata.
+          </p>
+          <ul className="space-y-2">
+            {unresolved.map((s) => (
+              <li
+                key={s.key}
+                className="rounded-lg border border-line bg-white p-3 flex items-center justify-between gap-2"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-mono">{s.isbn}</p>
+                  <p className="text-xs text-ink-muted mt-0.5">
+                    {s.status === 'not_found'
+                      ? 'Not in Open Library or Google Books'
+                      : s.status === 'error'
+                        ? s.message
+                        : ''}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {duplicates.length > 0 ? (
+        <section>
+          <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted mb-2">
+            Duplicates skipped ({duplicates.length})
+          </h3>
+          <ul className="space-y-1">
+            {duplicates.map((s) =>
+              s.status === 'duplicate' ? (
+                <li key={s.key} className="text-xs text-ink-soft">
+                  {s.title}
+                </li>
+              ) : null
+            )}
+          </ul>
+        </section>
+      ) : null}
+
+      <div className="flex gap-2 border-t border-line pt-4">
+        <button type="button" onClick={onScanMore} className={secondaryCls}>
+          Scan more
+        </button>
+        <button type="button" onClick={onDone} className={`${primaryCls} ml-auto`}>
+          Done
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function StatCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string
+  value: number
+  tone?: 'success' | 'danger'
+}) {
+  const cls =
+    tone === 'success'
+      ? 'bg-success/10 border-success/40 text-success'
+      : tone === 'danger'
+        ? 'bg-danger/10 border-danger/40 text-danger'
+        : 'bg-white border-line text-ink'
+  return (
+    <div className={`rounded-lg border p-3 ${cls}`}>
+      <p className="text-2xl font-semibold leading-none">{value}</p>
+      <p className="text-[10px] mt-1 uppercase tracking-wide opacity-80">
+        {label}
+      </p>
+    </div>
+  )
+}
+
 const inputCls =
   'mt-1 w-full rounded-md border border-line bg-white px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-indigo focus:border-indigo min-h-[44px]'
 
@@ -406,10 +583,12 @@ function Tile({
   onClick,
   title,
   subtitle,
+  badge,
 }: {
   onClick?: () => void
   title: string
   subtitle: string
+  badge?: string
 }) {
   return (
     <button
@@ -417,8 +596,17 @@ function Tile({
       onClick={onClick}
       className="w-full text-left rounded-xl border border-line bg-white p-4 min-h-[64px] hover:border-terracotta hover:shadow-sm transition-all"
     >
-      <p className="text-sm font-semibold text-ink">{title}</p>
-      <p className="text-xs text-ink-muted mt-1">{subtitle}</p>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-ink">{title}</p>
+          <p className="text-xs text-ink-muted mt-1">{subtitle}</p>
+        </div>
+        {badge ? (
+          <span className="text-xs font-medium rounded-full bg-terracotta/10 text-terracotta-strong px-2.5 py-0.5">
+            {badge}
+          </span>
+        ) : null}
+      </div>
     </button>
   )
 }

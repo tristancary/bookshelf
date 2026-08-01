@@ -23,9 +23,8 @@ export function CoverSearch({
   const [error, setError] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
 
-  async function handleSearch(e: React.FormEvent) {
-    e.preventDefault()
-    if (!query.trim()) return
+  async function runSearch() {
+    if (!query.trim() || busy) return
     setBusy(true)
     setError(null)
     setHasSearched(true)
@@ -46,6 +45,14 @@ export function CoverSearch({
     }
   }
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      e.stopPropagation()
+      runSearch()
+    }
+  }
+
   return (
     <div className="rounded-lg border border-line bg-parchment-soft p-3 space-y-3">
       <div className="flex items-center justify-between">
@@ -59,22 +66,24 @@ export function CoverSearch({
         </button>
       </div>
 
-      <form onSubmit={handleSearch} className="flex gap-2">
+      <div className="flex gap-2">
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={handleKeyDown}
           placeholder="Title, author, or both"
           className="flex-1 rounded-md border border-line bg-white px-3 py-2 text-sm min-h-[40px] focus:outline-none focus:ring-2 focus:ring-indigo focus:border-indigo"
         />
         <button
-          type="submit"
+          type="button"
+          onClick={runSearch}
           disabled={busy || !query.trim()}
           className="rounded-md bg-indigo hover:bg-indigo-strong disabled:opacity-50 text-parchment text-sm font-medium px-3 py-2 min-h-[40px]"
         >
           {busy ? 'Searching...' : 'Search'}
         </button>
-      </form>
+      </div>
 
       {error ? <p className="text-xs text-danger">{error}</p> : null}
 

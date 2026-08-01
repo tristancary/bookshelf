@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { lookupBookByIsbn } from '@/lib/bookLookup'
 
 export async function refreshBookMetadata(
   id: string
@@ -18,19 +19,8 @@ export async function refreshBookMetadata(
   if (!book) return { error: 'Book not found' }
   if (!book.isbn) return { error: 'No ISBN on this book to refresh from' }
 
-  // Hit our own lookup route so we get the same enrichment logic
-  const base =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    process.env.VERCEL_URL ||
-    'http://localhost:3000'
-  const url = base.startsWith('http') ? base : `https://${base}`
-
-  const res = await fetch(`${url}/api/lookup/${book.isbn}`, {
-    cache: 'no-store',
-  })
-  if (!res.ok) return { error: 'Lookup failed' }
-
-  const meta = await res.json()
+  const meta = await lookupBookByIsbn(book.isbn)
+  if (!meta) return { error: 'Lookup failed or book not found in providers' }
 
   const patch: Record<string, unknown> = {}
   const updatedFields: string[] = []

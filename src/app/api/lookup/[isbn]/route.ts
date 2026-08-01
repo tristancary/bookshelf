@@ -56,7 +56,7 @@ async function fromOpenLibrary(isbn: string): Promise<PartialMetadata | null> {
       published_year: extractYear(book.publish_date),
       publisher: book.publishers?.[0]?.name ?? null,
       page_count: book.number_of_pages ?? null,
-      description: null,
+      description: null, // OL's data endpoint doesn't include descriptions
       source: 'openlibrary',
     }
   } catch {
@@ -113,27 +113,41 @@ export async function GET(
     )
   }
 
-  const partial =
-    (await fromOpenLibrary(isbn)) ?? (await fromGoogleBooks(isbn))
+  // Fetch both in parallel so we can enrich missing fields from either source
+  const [olResult, gbResult] = await Promise.all([
+    fromOpenLibrary(isbn).catch(() => null),
+    fromGoogleBooks(isbn).catch(() => null),
+  ])
 
-  if (!partial) {
+  const primary = olResult ?? gbResult
+  if (!primary) {
     return NextResponse.json(
       { error: 'Book not found', isbn },
       { status: 404 }
     )
   }
 
-  // Shelf suggestion runs after metadata is resolved.
-  // Rules are instant; LLM adds ~1-2s only when rules find nothing.
+  // Cross-enrich: fill missing description and cover from the other source
+  const secondary = primary === olResult ? gbResult : olResult
+  const merged: PartialMetadata = {
+    ...primary,
+    description: primary.description || secondary?.description || null,
+    cover_url: primary.cover_url || secondary?.cover_url || null,
+    // Merge categories from both, dedupe
+    categories: Array.from(
+      new Set([...(primary.categories ?? []), ...(secondary?.categories ?? [])])
+    ).slice(0, 10),
+  }
+
   const suggestion = await suggestShelves({
-    title: partial.title,
-    authors: partial.authors,
-    categories: partial.categories,
-    description: partial.description,
+    title: merged.title,
+    authors: merged.authors,
+    categories: merged.categories,
+    description: merged.description,
   })
 
   const result: BookMetadata = {
-    ...partial,
+    ...merged,
     suggested_shelves: suggestion.shelves,
     suggestion_source: suggestion.source,
   }

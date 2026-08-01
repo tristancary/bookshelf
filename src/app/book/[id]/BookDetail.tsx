@@ -10,6 +10,7 @@ import {
   type LogStatus,
 } from './reading-actions'
 import { ShelfSelector } from '@/components/ShelfSelector'
+import { CoverSearch } from '@/components/CoverSearch'
 
 export type Book = {
   id: string
@@ -73,6 +74,7 @@ export default function BookDetail({
   const [draft, setDraft] = useState<Book>(book)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showCoverSearch, setShowCoverSearch] = useState(false)
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -98,6 +100,7 @@ export default function BookDetail({
       return
     }
     setMode('view')
+    setShowCoverSearch(false)
     router.refresh()
   }
 
@@ -116,6 +119,7 @@ export default function BookDetail({
   }
 
   if (mode === 'edit') {
+    const coverQuery = [draft.title, draft.authors[0]].filter(Boolean).join(' ')
     return (
       <form onSubmit={handleSave} className="space-y-5">
         <Field label="Title" required>
@@ -150,6 +154,70 @@ export default function BookDetail({
             existing={existingShelves}
           />
         </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-sm font-medium text-ink-soft">Cover</span>
+            {!showCoverSearch ? (
+              <button
+                type="button"
+                onClick={() => setShowCoverSearch(true)}
+                className="text-xs text-indigo hover:underline"
+              >
+                Find cover online
+              </button>
+            ) : null}
+          </div>
+          <div className="flex gap-3">
+            <div className="w-20 flex-shrink-0 aspect-[2/3] bg-parchment-strong rounded overflow-hidden border border-line">
+              {draft.cover_url ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={draft.cover_url}
+                  alt=""
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-[10px] text-ink-muted p-2 text-center">
+                  No cover
+                </div>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <input
+                type="url"
+                placeholder="https://..."
+                value={draft.cover_url ?? ''}
+                onChange={(e) => setDraft({ ...draft, cover_url: e.target.value })}
+                className={inputCls}
+              />
+              <p className="text-xs text-ink-muted mt-1">
+                Direct image URL, or use Find cover online above.
+              </p>
+            </div>
+          </div>
+          {showCoverSearch ? (
+            <div className="mt-3">
+              <CoverSearch
+                initialQuery={coverQuery}
+                onSelect={(url) => {
+                  setDraft({ ...draft, cover_url: url })
+                  setShowCoverSearch(false)
+                }}
+                onClose={() => setShowCoverSearch(false)}
+              />
+            </div>
+          ) : null}
+        </div>
+
+        <Field label="Description">
+          <textarea
+            rows={4}
+            value={draft.description ?? ''}
+            onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+            className={inputCls}
+          />
+        </Field>
 
         <Field label="Categories (auto from metadata)">
           <input
@@ -210,22 +278,6 @@ export default function BookDetail({
             className={inputCls}
           />
         </Field>
-        <Field label="Cover URL">
-          <input
-            type="url"
-            value={draft.cover_url ?? ''}
-            onChange={(e) => setDraft({ ...draft, cover_url: e.target.value })}
-            className={inputCls}
-          />
-        </Field>
-        <Field label="Description">
-          <textarea
-            rows={3}
-            value={draft.description ?? ''}
-            onChange={(e) => setDraft({ ...draft, description: e.target.value })}
-            className={inputCls}
-          />
-        </Field>
         <Field label="Notes">
           <textarea
             rows={2}
@@ -245,6 +297,7 @@ export default function BookDetail({
             onClick={() => {
               setDraft(book)
               setMode('view')
+              setShowCoverSearch(false)
               setError(null)
             }}
             className={secondaryCls}
@@ -289,6 +342,14 @@ export default function BookDetail({
         </div>
       </div>
 
+      {book.description ? (
+        <section className="border-t border-line pt-4">
+          <p className="text-sm leading-relaxed whitespace-pre-wrap text-ink-soft">
+            {book.description}
+          </p>
+        </section>
+      ) : null}
+
       <ReadingLogSection
         bookId={book.id}
         readers={readers}
@@ -317,15 +378,6 @@ export default function BookDetail({
               </span>
             ))}
           </div>
-        </section>
-      ) : null}
-
-      {book.description ? (
-        <section className="border-t border-line pt-4">
-          <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted mb-2">
-            Description
-          </h3>
-          <p className="text-sm leading-relaxed whitespace-pre-wrap">{book.description}</p>
         </section>
       ) : null}
 
@@ -369,7 +421,6 @@ function ReadingLogSection({
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [addingFor, setAddingFor] = useState<string | null>(null)
 
   const readerById = new Map(readers.map((r) => [r.id, r]))
   const loggedReaderIds = new Set(log.map((l) => l.reader_id))
@@ -378,10 +429,8 @@ function ReadingLogSection({
   async function handleQuickAdd(readerId: string, status: LogStatus) {
     setBusy(true)
     setError(null)
-    const today =
-      status === 'finished' ? new Date().toISOString().slice(0, 10) : null
-    const started =
-      status === 'reading' ? new Date().toISOString().slice(0, 10) : null
+    const today = status === 'finished' ? new Date().toISOString().slice(0, 10) : null
+    const started = status === 'reading' ? new Date().toISOString().slice(0, 10) : null
 
     const result = await upsertReadingLog({
       book_id: bookId,
@@ -395,7 +444,6 @@ function ReadingLogSection({
       setError(result.error)
       return
     }
-    setAddingFor(null)
     router.refresh()
   }
 
@@ -424,10 +472,7 @@ function ReadingLogSection({
         <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted">
           Reading log
         </h3>
-        <Link
-          href="/readers"
-          className="text-xs text-ink-muted hover:text-indigo"
-        >
+        <Link href="/readers" className="text-xs text-ink-muted hover:text-indigo">
           Manage readers
         </Link>
       </div>

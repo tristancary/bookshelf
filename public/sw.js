@@ -1,6 +1,6 @@
 // Bookshelf service worker: minimal caching + offline fallback
 
-const CACHE_VERSION = 'bookshelf-v1'
+const CACHE_VERSION = 'bookshelf-v2'
 const OFFLINE_URL = '/offline'
 
 const PRECACHE = [
@@ -72,7 +72,8 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // HTML navigation: network-first, fall back to offline page
+  // HTML navigation: network-first. Only fall back to offline page
+  // when the network truly fails (no server response at all).
   if (req.mode === 'navigate') {
     event.respondWith(
       fetch(req).catch(() =>
